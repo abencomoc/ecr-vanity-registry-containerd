@@ -1,6 +1,6 @@
 # ECR Vanity Registry with Containerd
 
-Use a custom registry hostname (e.g. `my-registry.lab`) in your Kubernetes manifests while pulling images from Amazon ECR under the hood.
+Use a custom registry hostname (e.g. `my-registry.lab`) in your Kubernetes manifests while pulling images from Amazon ECR in any AWS region and account.
 
 ## Problem
 
@@ -68,7 +68,7 @@ pod spec: image: my-registry.lab/shared/nginx:latest
        → pulls from ECR using the provided token
 ```
 
-Both the auth endpoint (api.ecr) and the Docker endpoint (dkr.ecr) need a region. The credential provider config handles the first; the containerd hosts.toml handles the second. This repo bakes both from a single Terraform variable so they stay in sync.
+Both the auth endpoint (api.ecr) and the Docker endpoint (dkr.ecr) must use the same AWS region. The credential provider config handles the first; the containerd hosts.toml handles the second. This solution bakes both from a single Terraform variable so they stay in sync.
 
 ## Architecture
 
