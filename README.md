@@ -142,8 +142,8 @@ Edit `infra-tf/terraform.tfvars`. Keep `ecr_pull_region` empty to pull images fr
 
 ### 2. Deploy infrastructure
 
-```bash
-./scripts/create-infra.sh
+```console
+$ ./scripts/create-infra.sh
 ```
 
 This creates:
@@ -154,44 +154,38 @@ This creates:
 
 ### 3. Configure kubectl
 
-```bash
-aws eks update-kubeconfig --name <cluster-name> --region <region>
+```console
+$ aws eks update-kubeconfig --name <cluster-name> --region <region>
 ```
 
 Or copy the command from `terraform output configure_kubectl`.
 
 ### 4. Push an image to ECR
 
-```bash
-./scripts/build-push-images.sh
+```console
+$ ./scripts/build-push-images.sh
 ```
 
 This pulls `public.ecr.aws/nginx/nginx:latest`, tags it, and pushes it to ECR in the cluster region. ECR replication triggers automatically, making the image available in the replication region as well.
 
 ### 5. Deploy with the vanity registry
 
-```bash
-kubectl apply -f manifest/nginx-vanity-registry.yaml
+```console
+$ kubectl apply -f manifest/nginx-vanity-registry.yaml
 ```
 
 ### 6. Verify
 
 The pod runs using the vanity image URI. Kubelet pulls from ECR transparently:
 
-```bash
-kubectl get po -o wide
-```
-
-```
+```console
+$ kubectl get po -o wide
 NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE                        NOMINATED NODE   READINESS GATES
 nginx-vanity-uri-684f854c7d-qdth4   1/1     Running   0          13m   10.0.1.203   ip-10-0-1-90.ec2.internal   <none>           <none>
 ```
 
-```bash
-kubectl describe pod | tail
-```
-
-```
+```console
+$ kubectl describe pod | tail
 Events:
   Type    Reason     Age   From               Message
   ----    ------     ----  ----               -------
@@ -204,14 +198,8 @@ Events:
 
 The node label confirms which ECR region it pulls from:
 
-```bash
-kubectl get nodes -o custom-columns=\
-NAME:.metadata.name,\
-REGION:.metadata.labels.topology\\.kubernetes\\.io/region,\
-ECR-PULL-REGION:.metadata.labels.node\\.kubernetes\\.io/ecr-pull-region
-```
-
-```
+```console
+$ kubectl get nodes -o custom-columns='NAME:.metadata.name,REGION:.metadata.labels.topology\.kubernetes\.io/region,ECR-PULL-REGION:.metadata.labels.node\.kubernetes\.io/ecr-pull-region'
 NAME                        REGION      ECR-PULL-REGION
 ip-10-0-1-90.ec2.internal   us-east-1   us-east-1
 ```
@@ -220,16 +208,13 @@ ip-10-0-1-90.ec2.internal   us-east-1   us-east-1
 
 Containerd debug logs show how the vanity URI resolves to the ECR registry in the cluster region:
 
-```bash
-# Get a shell on the node without SSH/SSM
-kubectl debug node/<node-name> -it --image=ubuntu -- bash
+```console
+$ # Get a shell on the node without SSH/SSM
+$ kubectl debug node/<node-name> -it --image=ubuntu -- bash
 
-# View containerd logs
-chroot /host journalctl -u containerd --no-pager \
+$ # View containerd logs
+$ chroot /host journalctl -u containerd --no-pager \
   | grep -A12 "RunPodSandbox" | grep -A12 "nginx-vanity-uri"
-```
-
-```
 containerd: PullImage "my-registry.lab/shared/nginx:latest"
 containerd: loading host directory dir=/etc/containerd/certs.d/my-registry.lab
 containerd: resolving host=123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com
@@ -246,32 +231,27 @@ The 401 → 200 sequence is normal — it's the standard Docker Registry V2 auth
 
 ### 8. Failover to a Replica Region
 
-Update `ecr_pull_region` in `terraform.tfvars` to point to the replication region and apply:
+Update `ecr_pull_region` in `terraform.tfvars` to point to the replication region:
 
 ```hcl
 ecr_pull_region = "us-west-1"
 ```
 
-```bash
-terraform apply
+Then apply:
+```console
+$ terraform apply
 ```
 
 EKS managed node group replaces the nodes (this may take a few minutes). Once the new nodes are ready:
 
-```bash
-kubectl get po -o wide
-```
-
-```
+```console
+$ kubectl get po -o wide
 NAME                                READY   STATUS    RESTARTS   AGE     IP           NODE                         NOMINATED NODE   READINESS GATES
 nginx-vanity-uri-684f854c7d-hxkvt   1/1     Running   0          3m28s   10.0.2.114   ip-10-0-2-137.ec2.internal   <none>           <none>
 ```
 
-```bash
-kubectl describe pod | tail
-```
-
-```
+```console
+$ kubectl describe pod | tail
 Events:
   Type    Reason     Age    From               Message
   ----    ------     ----   ----               -------
@@ -284,27 +264,18 @@ Events:
 
 The node label now shows the replica region:
 
-```bash
-kubectl get nodes -o custom-columns=\
-NAME:.metadata.name,\
-REGION:.metadata.labels.topology\\.kubernetes\\.io/region,\
-ECR-PULL-REGION:.metadata.labels.node\\.kubernetes\\.io/ecr-pull-region
-```
-
-```
+```console
+$ kubectl get nodes -o custom-columns='NAME:.metadata.name,REGION:.metadata.labels.topology\.kubernetes\.io/region,ECR-PULL-REGION:.metadata.labels.node\.kubernetes\.io/ecr-pull-region'
 NAME                         REGION      ECR-PULL-REGION
 ip-10-0-2-137.ec2.internal   us-east-1   us-west-1
 ```
 
 Containerd debug logs confirm the vanity URI now resolves to ECR in the replication region:
 
-```bash
-kubectl debug node/<node-name> -it --image=ubuntu -- bash
-chroot /host journalctl -u containerd --no-pager \
+```console
+$ kubectl debug node/<node-name> -it --image=ubuntu -- bash
+$ chroot /host journalctl -u containerd --no-pager \
   | grep -A12 "RunPodSandbox" | grep -A12 "nginx-vanity-uri"
-```
-
-```
 containerd: PullImage "my-registry.lab/shared/nginx:latest"
 containerd: loading host directory dir=/etc/containerd/certs.d/my-registry.lab
 containerd: resolving host=123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com
@@ -321,22 +292,22 @@ Manifests stay unchanged — only the Terraform variable controls which ECR regi
 
 ### Additional node inspection commands
 
-```bash
-# Get a shell on the node
-kubectl debug node/<node-name> -it --image=ubuntu -- bash
+```console
+$ # Get a shell on the node
+$ kubectl debug node/<node-name> -it --image=ubuntu -- bash
 
-# Check containerd config
-cat /host/etc/containerd/config.toml
+$ # Check containerd config
+$ cat /host/etc/containerd/config.toml
 
-# Check the containerd hosts mirror config
-cat /host/etc/containerd/certs.d/my-registry.lab/hosts.toml
+$ # Check the containerd hosts mirror config
+$ cat /host/etc/containerd/certs.d/my-registry.lab/hosts.toml
 
-# Check credential provider config
-cat /host/etc/eks/image-credential-provider/config.json
+$ # Check credential provider config
+$ cat /host/etc/eks/image-credential-provider/config.json
 ```
 
 ## Cleanup
 
-```bash
-./scripts/cleanup.sh
+```console
+$ ./scripts/cleanup.sh
 ```
