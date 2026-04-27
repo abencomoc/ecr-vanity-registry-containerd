@@ -143,9 +143,7 @@ Edit `infra-tf/terraform.tfvars`. Keep `ecr_pull_region` empty to pull images fr
 ### 2. Deploy infrastructure
 
 ```bash
-cd infra-tf
-terraform init
-terraform apply
+./scripts/create-infra.sh
 ```
 
 This creates:
@@ -246,7 +244,7 @@ containerd: resolved desc.digest="sha256:162bf60c..." host=123456EXAMPLE.dkr.ecr
 
 The 401 → 200 sequence is normal — it's the standard Docker Registry V2 auth challenge-response flow.
 
-## Failover to a Replica Region
+### 8. Failover to a Replica Region
 
 Update `ecr_pull_region` in `terraform.tfvars` to point to the replication region and apply:
 
@@ -340,6 +338,5 @@ cat /host/etc/eks/image-credential-provider/config.json
 ## Cleanup
 
 ```bash
-cd infra-tf
-terraform destroy
+./scripts/cleanup.sh
 ```
