@@ -1,6 +1,6 @@
 # ECR Vanity Registry with Containerd
 
-Use a custom registry hostname (e.g. `my-registry.lab`) in your Kubernetes manifests while pulling images from Amazon ECR in any AWS region and account.
+Use a custom registry hostname (e.g. `my-registry.lab`) in your Kubernetes manifests while pulling images from same-region and cross-region Amazon ECR.
 
 ## Problem
 
