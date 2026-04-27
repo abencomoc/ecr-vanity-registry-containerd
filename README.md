@@ -182,16 +182,24 @@ The pod runs using the vanity image URI. Kubelet pulls from ECR transparently:
 kubectl get po -o wide
 ```
 
-```text
+<details>
+<summary>Expected output</summary>
+
+```
 NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE                        NOMINATED NODE   READINESS GATES
 nginx-vanity-uri-684f854c7d-qdth4   1/1     Running   0          13m   10.0.1.203   ip-10-0-1-90.ec2.internal   <none>           <none>
 ```
+
+</details>
 
 ```bash
 kubectl describe pod | tail
 ```
 
-```text
+<details>
+<summary>Expected output</summary>
+
+```
 Events:
   Type    Reason     Age   From               Message
   ----    ------     ----  ----               -------
@@ -202,16 +210,23 @@ Events:
   Normal  Started    13m   kubelet            Container started
 ```
 
+</details>
+
 The node label confirms which ECR region it pulls from:
 
 ```bash
 kubectl get nodes -o custom-columns='NAME:.metadata.name,REGION:.metadata.labels.topology\.kubernetes\.io/region,ECR-PULL-REGION:.metadata.labels.node\.kubernetes\.io/ecr-pull-region'
 ```
 
-```text
+<details>
+<summary>Expected output</summary>
+
+```
 NAME                        REGION      ECR-PULL-REGION
 ip-10-0-1-90.ec2.internal   us-east-1   us-east-1
 ```
+
+</details>
 
 ### 7. Inspect containerd logs
 
@@ -226,7 +241,10 @@ chroot /host journalctl -u containerd --no-pager \
   | grep -A12 "RunPodSandbox" | grep -A12 "nginx-vanity-uri"
 ```
 
-```text
+<details>
+<summary>Expected output</summary>
+
+```
 containerd: PullImage "my-registry.lab/shared/nginx:latest"
 containerd: loading host directory dir=/etc/containerd/certs.d/my-registry.lab
 containerd: resolving host=123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com
@@ -238,6 +256,8 @@ containerd: do request host=123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com reques
 containerd: fetch response received response.status="200 OK"
 containerd: resolved desc.digest="sha256:162bf60c..." host=123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com
 ```
+
+</details>
 
 The 401 → 200 sequence is normal — it's the standard Docker Registry V2 auth challenge-response flow.
 
@@ -260,16 +280,24 @@ EKS managed node group replaces the nodes (this may take a few minutes). Once th
 kubectl get po -o wide
 ```
 
-```text
+<details>
+<summary>Expected output</summary>
+
+```
 NAME                                READY   STATUS    RESTARTS   AGE     IP           NODE                         NOMINATED NODE   READINESS GATES
 nginx-vanity-uri-684f854c7d-hxkvt   1/1     Running   0          3m28s   10.0.2.114   ip-10-0-2-137.ec2.internal   <none>           <none>
 ```
+
+</details>
 
 ```bash
 kubectl describe pod | tail
 ```
 
-```text
+<details>
+<summary>Expected output</summary>
+
+```
 Events:
   Type    Reason     Age    From               Message
   ----    ------     ----   ----               -------
@@ -280,16 +308,23 @@ Events:
   Normal  Started    3m40s  kubelet            Container started
 ```
 
+</details>
+
 The node label now shows the replica region:
 
 ```bash
 kubectl get nodes -o custom-columns='NAME:.metadata.name,REGION:.metadata.labels.topology\.kubernetes\.io/region,ECR-PULL-REGION:.metadata.labels.node\.kubernetes\.io/ecr-pull-region'
 ```
 
-```text
+<details>
+<summary>Expected output</summary>
+
+```
 NAME                         REGION      ECR-PULL-REGION
 ip-10-0-2-137.ec2.internal   us-east-1   us-west-1
 ```
+
+</details>
 
 Containerd debug logs confirm the vanity URI now resolves to ECR in the replication region:
 
@@ -299,7 +334,10 @@ chroot /host journalctl -u containerd --no-pager \
   | grep -A12 "RunPodSandbox" | grep -A12 "nginx-vanity-uri"
 ```
 
-```text
+<details>
+<summary>Expected output</summary>
+
+```
 containerd: PullImage "my-registry.lab/shared/nginx:latest"
 containerd: loading host directory dir=/etc/containerd/certs.d/my-registry.lab
 containerd: resolving host=123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com
@@ -311,6 +349,8 @@ containerd: do request host=123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com reques
 containerd: fetch response received response.status="200 OK"
 containerd: resolved desc.digest="sha256:162bf60c..." host=123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com
 ```
+
+</details>
 
 Manifests stay unchanged — only the Terraform variable controls which ECR region nodes pull from.
 
