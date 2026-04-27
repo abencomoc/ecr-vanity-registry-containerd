@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-vanity-registry
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-vanity-registry
+  template:
+    metadata:
+      labels:
+        app: nginx-vanity-registry
+    spec:
+      containers:
+        - name: nginx
+          image: my-registry.lab/shared/nginx:latest
+          ports:
+            - containerPort: 80
