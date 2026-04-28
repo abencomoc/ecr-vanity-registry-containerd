@@ -7,7 +7,7 @@ Use a custom registry hostname (e.g. `my-registry.lab`) in your Kubernetes manif
 ECR image URIs are long and encode infrastructure details:
 
 ```
-123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com/shared/nginx:latest
+123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com/global/nginx:latest
 ```
 
 Every manifest, Helm chart, and CI pipeline that references this URI is now coupled to a specific AWS account and region. If you replicate images to another region for DR or migrate accounts, you're updating image references everywhere.
@@ -19,7 +19,7 @@ This approach uses two node-level configurations — one for containerd and one 
 Developers write manifests with the vanity name:
 
 ```yaml
-image: my-registry.lab/shared/nginx:latest
+image: my-registry.lab/global/nginx:latest
 ```
 
 When kubelet processes the pod spec, two things happen:
@@ -52,7 +52,7 @@ This tells containerd to resolve `my-registry.lab` against the ECR Docker endpoi
 ### The Full Flow
 
 ```
-pod spec: image: my-registry.lab/shared/nginx:latest
+pod spec: image: my-registry.lab/global/nginx:latest
     │
     ├─ kubelet checks matchImages → "my-registry.lab" matches
     │  → invokes ecr-credential-provider
@@ -82,7 +82,7 @@ Both the auth endpoint (api.ecr) and the Docker endpoint (dkr.ecr) must use the 
   │  │  ┌────────────────────────────────────┐  │  │
   │  │  │ Pod                                │  │  │
   │  │  │ image: my-registry.lab/            │  │  │
-  │  │  │        shared/nginx:latest         │  │  │
+  │  │  │        global/nginx:latest         │  │  │
   │  │  └────────────────────────────────────┘  │  │
   │  │                                          │  │
   │  │  containerd hosts.toml:                  │  │
@@ -105,7 +105,7 @@ Both the auth endpoint (api.ecr) and the Docker endpoint (dkr.ecr) must use the 
   ┌──────────────────┐    ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─┐
   │  ECR (primary)   │      ECR (replica)
   │  us-east-1       │───▶│ us-west-1        │
-  │  shared/nginx    │      shared/nginx
+  │  global/nginx    │      global/nginx
   └──────────────────┘    └ ─ ─ ─ ─ ─ ─ ─ ─ ─┘
 ```
 
@@ -114,7 +114,7 @@ The Terraform configuration creates:
 - **VPC** — 2 AZs, public/private subnets, single NAT gateway
 - **EKS cluster** — managed control plane with coredns, kube-proxy, vpc-cni addons
 - **Managed node group** — AL2023 nodes with cloud-init scripts that write the containerd and credential provider configs at boot
-- **ECR repository** — `shared/nginx` with cross-region replication
+- **ECR repository** — `global/nginx` with cross-region replication
 
 
 ## Demo
@@ -204,8 +204,8 @@ Events:
   Type    Reason     Age   From               Message
   ----    ------     ----  ----               -------
   Normal  Scheduled  13m   default-scheduler  Successfully assigned default/nginx-vanity-uri-684f854c7d-qdth4 to ip-10-0-1-90.ec2.internal
-  Normal  Pulling    13m   kubelet            Pulling image "my-registry.lab/shared/nginx:latest"
-  Normal  Pulled     13m   kubelet            Successfully pulled image "my-registry.lab/shared/nginx:latest" in 124ms (124ms including waiting). Image size: 66133124 bytes.
+  Normal  Pulling    13m   kubelet            Pulling image "my-registry.lab/global/nginx:latest"
+  Normal  Pulled     13m   kubelet            Successfully pulled image "my-registry.lab/global/nginx:latest" in 124ms (124ms including waiting). Image size: 66133124 bytes.
   Normal  Created    13m   kubelet            Container created
   Normal  Started    13m   kubelet            Container started
 ```
@@ -245,14 +245,14 @@ chroot /host journalctl -u containerd --no-pager \
 <summary>Expected output</summary>
 
 ```
-containerd: PullImage "my-registry.lab/shared/nginx:latest"
+containerd: PullImage "my-registry.lab/global/nginx:latest"
 containerd: loading host directory dir=/etc/containerd/certs.d/my-registry.lab
 containerd: resolving host=123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com
 containerd: do request host=123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com request.method=HEAD
-  url="https://123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com/v2/shared/nginx/manifests/latest?ns=my-registry.lab"
+  url="https://123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com/v2/global/nginx/manifests/latest?ns=my-registry.lab"
 containerd: fetch response received response.status="401 Unauthorized"
 containerd: do request host=123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com request.method=HEAD
-  url="https://123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com/v2/shared/nginx/manifests/latest?ns=my-registry.lab"
+  url="https://123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com/v2/global/nginx/manifests/latest?ns=my-registry.lab"
 containerd: fetch response received response.status="200 OK"
 containerd: resolved desc.digest="sha256:162bf60c..." host=123456EXAMPLE.dkr.ecr.us-east-1.amazonaws.com
 ```
@@ -302,8 +302,8 @@ Events:
   Type    Reason     Age    From               Message
   ----    ------     ----   ----               -------
   Normal  Scheduled  3m41s  default-scheduler  Successfully assigned default/nginx-vanity-uri-684f854c7d-hxkvt to ip-10-0-2-137.ec2.internal
-  Normal  Pulling    3m40s  kubelet            Pulling image "my-registry.lab/shared/nginx:latest"
-  Normal  Pulled     3m40s  kubelet            Successfully pulled image "my-registry.lab/shared/nginx:latest" in 442ms (442ms including waiting). Image size: 66133124 bytes.
+  Normal  Pulling    3m40s  kubelet            Pulling image "my-registry.lab/global/nginx:latest"
+  Normal  Pulled     3m40s  kubelet            Successfully pulled image "my-registry.lab/global/nginx:latest" in 442ms (442ms including waiting). Image size: 66133124 bytes.
   Normal  Created    3m40s  kubelet            Container created
   Normal  Started    3m40s  kubelet            Container started
 ```
@@ -338,14 +338,14 @@ chroot /host journalctl -u containerd --no-pager \
 <summary>Expected output</summary>
 
 ```
-containerd: PullImage "my-registry.lab/shared/nginx:latest"
+containerd: PullImage "my-registry.lab/global/nginx:latest"
 containerd: loading host directory dir=/etc/containerd/certs.d/my-registry.lab
 containerd: resolving host=123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com
 containerd: do request host=123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com request.method=HEAD
-  url="https://123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com/v2/shared/nginx/manifests/latest?ns=my-registry.lab"
+  url="https://123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com/v2/global/nginx/manifests/latest?ns=my-registry.lab"
 containerd: fetch response received response.status="401 Unauthorized"
 containerd: do request host=123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com request.method=HEAD
-  url="https://123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com/v2/shared/nginx/manifests/latest?ns=my-registry.lab"
+  url="https://123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com/v2/global/nginx/manifests/latest?ns=my-registry.lab"
 containerd: fetch response received response.status="200 OK"
 containerd: resolved desc.digest="sha256:162bf60c..." host=123456EXAMPLE.dkr.ecr.us-west-1.amazonaws.com
 ```

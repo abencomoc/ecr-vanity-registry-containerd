@@ -5,14 +5,14 @@ data "aws_region" "current" {}
 # ECR Repository
 # -----------------------------------------------------------------------------
 
-resource "aws_ecr_repository" "shared_nginx" {
-  name                 = "shared/nginx"
+resource "aws_ecr_repository" "global_nginx" {
+  name                 = "global/nginx"
   image_tag_mutability = "MUTABLE"
   force_delete         = true
 }
 
 # -----------------------------------------------------------------------------
-# ECR Replication — replicate shared/* to a secondary region
+# ECR Replication — replicate global/* to a secondary region
 # -----------------------------------------------------------------------------
 
 resource "aws_ecr_replication_configuration" "this" {
@@ -24,7 +24,7 @@ resource "aws_ecr_replication_configuration" "this" {
       }
 
       repository_filter {
-        filter      = "shared"
+        filter      = "global"
         filter_type = "PREFIX_MATCH"
       }
     }

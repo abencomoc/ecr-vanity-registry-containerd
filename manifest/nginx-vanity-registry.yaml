@@ -15,6 +15,6 @@ spec:
     spec:
       containers:
         - name: nginx
-          image: my-registry.lab/shared/nginx:latest
+          image: my-registry.lab/global/nginx:latest
           ports:
             - containerPort: 80

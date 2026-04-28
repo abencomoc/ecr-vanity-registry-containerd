@@ -26,15 +26,19 @@ else
 fi
 echo "Using container runtime: $RUNTIME"
 
-# Authenticate to ECR
+# Clear any stale ECR credentials that Docker might send to public.ecr.aws
+$RUNTIME logout public.ecr.aws 2>/dev/null || true
+$RUNTIME logout "$ECR_REGISTRY" 2>/dev/null || true
+
+# Pull public nginx BEFORE private ECR login
+$RUNTIME pull --platform linux/amd64 public.ecr.aws/nginx/nginx:latest
+
+# Authenticate to private ECR
 aws ecr get-login-password --region "$REGION" | \
   $RUNTIME login --username AWS --password-stdin "$ECR_REGISTRY"
 
-# Pull public nginx (x86 for EKS nodes)
-$RUNTIME pull --platform linux/amd64 public.ecr.aws/nginx/nginx:latest
-
-# Push to shared/nginx:latest
-$RUNTIME tag public.ecr.aws/nginx/nginx:latest "${ECR_REGISTRY}/shared/nginx:latest"
-$RUNTIME push "${ECR_REGISTRY}/shared/nginx:latest"
+# Push to global/nginx:latest
+$RUNTIME tag public.ecr.aws/nginx/nginx:latest "${ECR_REGISTRY}/global/nginx:latest"
+$RUNTIME push "${ECR_REGISTRY}/global/nginx:latest"
 
 echo "Done. Images pushed to ECR."
