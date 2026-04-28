@@ -361,9 +361,11 @@ Manifests stay unchanged — only the Terraform variable controls which ECR regi
 
 ## Limitations and Security Considerations
 
-This approach trades runtime flexibility for simplicity and a tight security boundary. It's worth understanding what that means in practice.
+### Node-level config requires node replacement
 
 The containerd mirror and credential provider configs are baked into each node at boot via cloud-init. There is no daemon, no sidecar, and no control-plane component reconciling these configs after the node joins the cluster. If you change the ECR pull region, the vanity hostname, or the target account, you need to apply the Terraform change and let the managed node group roll new nodes. Existing nodes keep their original config until they are replaced. This makes failover a deliberate infrastructure operation, not an instant runtime switch.
+
+### Credential exposure risk
 
 The credential provider is configured to issue ECR tokens for a non-ECR hostname. A [similar registry-mapping feature](https://github.com/awslabs/amazon-ecr-credential-helper/issues/947) was proposed and rejected in the `ecr-credential-helper` project due to concerns that valid AWS credentials could be sent to third-party registries if the containerd mirror config and the credential helper mapping drifted out of sync.
 
