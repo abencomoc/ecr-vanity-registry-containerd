@@ -359,21 +359,19 @@ containerd: resolved desc.digest="sha256:162bf60c..." host=123456EXAMPLE.dkr.ecr
 
 Manifests stay unchanged — only the Terraform variable controls which ECR region nodes pull from.
 
-### Additional node inspection commands
+## Limitations and Security Considerations
 
-```bash
-# Get a shell on the node
-kubectl debug node/<node-name> -it --image=ubuntu -- bash
+This approach trades runtime flexibility for simplicity and a tight security boundary. It's worth understanding what that means in practice.
 
-# Check containerd config
-cat /host/etc/containerd/config.toml
+The containerd mirror and credential provider configs are baked into each node at boot via cloud-init. There is no daemon, no sidecar, and no control-plane component reconciling these configs after the node joins the cluster. If you change the ECR pull region, the vanity hostname, or the target account, you need to apply the Terraform change and let the managed node group roll new nodes. Existing nodes keep their original config until they are replaced. This makes failover a deliberate infrastructure operation, not an instant runtime switch.
 
-# Check the containerd hosts mirror config
-cat /host/etc/containerd/certs.d/my-registry.lab/hosts.toml
+The credential provider is configured to issue ECR tokens for a non-ECR hostname. A [similar registry-mapping feature](https://github.com/awslabs/amazon-ecr-credential-helper/issues/947) was proposed and rejected in the `ecr-credential-helper` project due to concerns that valid AWS credentials could be sent to third-party registries if the containerd mirror config and the credential helper mapping drifted out of sync.
 
-# Check credential provider config
-cat /host/etc/eks/image-credential-provider/config.json
-```
+This setup mitigates that risk:
+
+- The vanity hostname uses a non-routable TLD (`.lab`) — if the containerd `hosts.toml` is removed, pulls fail rather than leaking credentials to a public registry
+- Both the containerd mirror and credential provider configs are generated from the same Terraform variables in a single cloud-init script, preventing independent config drift
+- DNS for the vanity hostname should be controlled on the node network — adding a DNS record for it (via corporate DNS, `/etc/hosts`, or a cluster resolver) would allow a rogue server to intercept ECR tokens
 
 ## Cleanup
 
