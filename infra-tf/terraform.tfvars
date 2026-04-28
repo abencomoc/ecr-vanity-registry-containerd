@@ -3,7 +3,7 @@
 # ──────────────────────────────────────────────────────────────
 
 aws_region         = "us-east-1"
-cluster_name       = "ecr-vanity-uri-demo"
+cluster_name       = "ecr-vanity-registry"
 cluster_version    = "1.35"
 node_instance_type = "t3.small"
 
