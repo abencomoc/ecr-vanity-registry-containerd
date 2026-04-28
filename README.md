@@ -187,7 +187,7 @@ kubectl get po -o wide
 
 ```
 NAME                                READY   STATUS    RESTARTS   AGE   IP           NODE                        NOMINATED NODE   READINESS GATES
-nginx-vanity-uri-684f854c7d-qdth4   1/1     Running   0          13m   10.0.1.203   ip-10-0-1-90.ec2.internal   <none>           <none>
+nginx-vanity-registry-684f854c7d-qdth4   1/1     Running   0          13m   10.0.1.203   ip-10-0-1-90.ec2.internal   <none>           <none>
 ```
 
 </details>
@@ -203,7 +203,7 @@ kubectl describe pod | tail
 Events:
   Type    Reason     Age   From               Message
   ----    ------     ----  ----               -------
-  Normal  Scheduled  13m   default-scheduler  Successfully assigned default/nginx-vanity-uri-684f854c7d-qdth4 to ip-10-0-1-90.ec2.internal
+  Normal  Scheduled  13m   default-scheduler  Successfully assigned default/nginx-vanity-registry-684f854c7d-qdth4 to ip-10-0-1-90.ec2.internal
   Normal  Pulling    13m   kubelet            Pulling image "my-registry.lab/global/nginx:latest"
   Normal  Pulled     13m   kubelet            Successfully pulled image "my-registry.lab/global/nginx:latest" in 124ms (124ms including waiting). Image size: 66133124 bytes.
   Normal  Created    13m   kubelet            Container created
@@ -228,17 +228,17 @@ ip-10-0-1-90.ec2.internal   us-east-1   us-east-1
 
 </details>
 
-### 7. Inspect containerd logs
-
 Containerd debug logs show how the vanity URI resolves to the ECR registry in the cluster region:
 
 ```bash
-# Get a shell on the node without SSH/SSM
-kubectl debug node/<node-name> -it --image=ubuntu -- bash
+# Get the node name where the vanity registry pod is running
+NODE_NAME=$(kubectl get pod -l app=nginx-vanity-registry -o jsonpath='{.items[0].spec.nodeName}')
+
+# Get a shell on that node
+kubectl debug node/$NODE_NAME -it --image=ubuntu -- bash
 
 # View containerd logs
-chroot /host journalctl -u containerd --no-pager \
-  | grep -A12 "RunPodSandbox" | grep -A12 "nginx-vanity-uri"
+chroot /host journalctl -u containerd --no-pager | grep -m1 -A12 --color=always 'msg="PullImage \\"my-registry.lab' | grep -E 'response.status|$'
 ```
 
 <details>
@@ -261,7 +261,7 @@ containerd: resolved desc.digest="sha256:162bf60c..." host=123456EXAMPLE.dkr.ecr
 
 The 401 → 200 sequence is normal — it's the standard Docker Registry V2 auth challenge-response flow.
 
-### 8. Failover to a Replica Region
+### 7. Failover to a Replica Region
 
 Update `ecr_pull_region` in `terraform.tfvars` to point to the replication region:
 
@@ -271,7 +271,7 @@ ecr_pull_region = "us-west-1"
 
 Then apply:
 ```bash
-terraform apply
+./scripts/create-infra.sh 
 ```
 
 EKS managed node group replaces the nodes (this may take a few minutes). Once the new nodes are ready:
@@ -285,7 +285,7 @@ kubectl get po -o wide
 
 ```
 NAME                                READY   STATUS    RESTARTS   AGE     IP           NODE                         NOMINATED NODE   READINESS GATES
-nginx-vanity-uri-684f854c7d-hxkvt   1/1     Running   0          3m28s   10.0.2.114   ip-10-0-2-137.ec2.internal   <none>           <none>
+nginx-vanity-registry-684f854c7d-hxkvt   1/1     Running   0          3m28s   10.0.2.114   ip-10-0-2-137.ec2.internal   <none>           <none>
 ```
 
 </details>
@@ -301,7 +301,7 @@ kubectl describe pod | tail
 Events:
   Type    Reason     Age    From               Message
   ----    ------     ----   ----               -------
-  Normal  Scheduled  3m41s  default-scheduler  Successfully assigned default/nginx-vanity-uri-684f854c7d-hxkvt to ip-10-0-2-137.ec2.internal
+  Normal  Scheduled  3m41s  default-scheduler  Successfully assigned default/nginx-vanity-registry-684f854c7d-hxkvt to ip-10-0-2-137.ec2.internal
   Normal  Pulling    3m40s  kubelet            Pulling image "my-registry.lab/global/nginx:latest"
   Normal  Pulled     3m40s  kubelet            Successfully pulled image "my-registry.lab/global/nginx:latest" in 442ms (442ms including waiting). Image size: 66133124 bytes.
   Normal  Created    3m40s  kubelet            Container created
@@ -329,9 +329,14 @@ ip-10-0-2-137.ec2.internal   us-east-1   us-west-1
 Containerd debug logs confirm the vanity URI now resolves to ECR in the replication region:
 
 ```bash
-kubectl debug node/<node-name> -it --image=ubuntu -- bash
-chroot /host journalctl -u containerd --no-pager \
-  | grep -A12 "RunPodSandbox" | grep -A12 "nginx-vanity-uri"
+# Get the node name where the vanity registry pod is running
+NODE_NAME=$(kubectl get pod -l app=nginx-vanity-registry -o jsonpath='{.items[0].spec.nodeName}')
+
+# Get a shell on that node
+kubectl debug node/$NODE_NAME -it --image=ubuntu -- bash
+
+# View containerd logs
+chroot /host journalctl -u containerd --no-pager | grep -m1 -A12 --color=always 'msg="PullImage \\"my-registry.lab' | grep -E 'response.status|$'
 ```
 
 <details>
