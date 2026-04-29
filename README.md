@@ -367,13 +367,14 @@ The containerd mirror and credential provider configs are baked into each node a
 
 ### Credential exposure risk
 
-The credential provider is configured to issue ECR tokens for a non-ECR hostname. A [similar registry-mapping feature](https://github.com/awslabs/amazon-ecr-credential-helper/issues/947) was proposed and rejected in the `ecr-credential-helper` project due to concerns that valid AWS credentials could be sent to third-party registries if the containerd mirror config and the credential helper mapping drifted out of sync.
+The credential provider is configured to issue ECR tokens for a non-ECR hostname. If not configured correctly, ECR tokens could be sent to third-party registries or unexpected endpoints behind the custom non-ECR hostname. This risk is discussed in more detail in [this ecr-credential-helper issue](https://github.com/awslabs/amazon-ecr-credential-helper/issues/947).
 
 This setup mitigates that risk:
 
 - The vanity hostname uses a non-routable TLD (`.lab`) — if the containerd `hosts.toml` is removed, pulls fail rather than leaking credentials to a public registry
 - Both the containerd mirror and credential provider configs are generated from the same Terraform variables in a single cloud-init script, preventing independent config drift
-- DNS for the vanity hostname should be controlled on the node network — adding a DNS record for it (via corporate DNS, `/etc/hosts`, or a cluster resolver) would allow a rogue server to intercept ECR tokens
+
+Additionally, ensure that you control the DNS for the vanity hostname in the Internet and within your network, to avoid sending ECR tokens to unexpected endpoints.
 
 ## Cleanup
 
